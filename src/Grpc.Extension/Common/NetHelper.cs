@@ -4,6 +4,9 @@ using System.Net.NetworkInformation;
 
 namespace Grpc.Extension
 {
+    /// <summary>
+    /// ref: https://github.com/FollowmeTech/fm.consulinterop/blob/master/src/FM.ConsulInterop/NetHelper.cs
+    /// </summary>
     public static class NetHelper
     {
         /// <summary>
@@ -11,6 +14,11 @@ namespace Grpc.Extension
         /// </summary>
         private const string IPSegmentRegex = @"\d{0,3}";
 
+        /// <summary>
+        /// Gets the ip.
+        /// </summary>
+        /// <param name="ipSegment">ip段</param>
+        /// <returns></returns>
         /// <summary>
         /// Gets the ip.
         /// </summary>
@@ -30,7 +38,7 @@ namespace Grpc.Extension
             ipSegment = ipSegment.Replace("*", IPSegmentRegex).Replace(".", "\\.");
 
             var hostAddrs = NetworkInterface.GetAllNetworkInterfaces()
-            .Where(i => i.NetworkInterfaceType == NetworkInterfaceType.Ethernet)
+                .Where(i => i.NetworkInterfaceType == NetworkInterfaceType.Ethernet || i.NetworkInterfaceType == NetworkInterfaceType.Wireless80211)
                 .SelectMany(i => i.GetIPProperties().UnicastAddresses)
                 .Select(a => a.Address)
                 .Where(a => !(a.IsIPv6LinkLocal || a.IsIPv6Multicast || a.IsIPv6SiteLocal || a.IsIPv6Teredo))
@@ -45,7 +53,8 @@ namespace Grpc.Extension
                 }
             }
 
-            throw new Exception($"找不到ipsegement:{ipSegment}匹配的ip, OR No network adapters with an IPv4 address in the system!");
+            var allIps = string.Join("|", hostAddrs.ConvertAll(p => p.ToString()));
+            throw new Exception($"所有的IP:({allIps})中, 找不到ipsegement:{ipSegment}匹配的ip");
         }
 
         /// <summary>
