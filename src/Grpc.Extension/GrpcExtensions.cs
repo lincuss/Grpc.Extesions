@@ -107,6 +107,12 @@ namespace Grpc.Extension
             foreach (var serverServiceDefinition in server.Services)
             {
                 var bindingFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+                /*
+                 * callHandlers:
+                 * 
+                 * 定义在server.ServiceDefinition中
+                 * private readonly Dictionary<string, IServerCallHandler> callHandlers = new Dictionary<string, IServerCallHandler>();
+                 */
                 var callHandlers = serverServiceDefinition.GetPropertyValue<IDictionary>("CallHandlers", bindingFlags);
                 GrpcServiceExtension.BuildMeta(callHandlers);
             }
@@ -142,7 +148,10 @@ namespace Grpc.Extension
                 MetaModel.StartTime = DateTime.Now;
                 MetaModel.Ip = ipAndPort.Host;
                 MetaModel.Port = ipAndPort.BoundPort;
+
+                //todo  不能使用console writeline
                 Console.WriteLine($"server listening {MetaModel.Ip}:{MetaModel.Port}");
+
                 //注册到Consul
                 var consulManager = ServiceProvider.GetService<ConsulManager>();
                 consulManager.RegisterService();

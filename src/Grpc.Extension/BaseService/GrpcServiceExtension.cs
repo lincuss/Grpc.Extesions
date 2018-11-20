@@ -1,9 +1,7 @@
 ﻿using Grpc.Core;
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Reflection;
-using System.Text;
 using Grpc.Extension.Common;
 using Grpc.Extension.Model;
 
@@ -48,7 +46,33 @@ namespace Grpc.Extension.BaseService
             //获取Grpc元数据信息
             foreach (DictionaryEntry callHandler in callHandlers)
             {
-                //反射获取Handlers
+                //实现过程
+                /*
+                 * grpc注入handler:
+                 *      public static grpc::ServerServiceDefinition BindService(GreeterBase serviceImpl)
+                        {
+                                return grpc::ServerServiceDefinition.CreateBuilder()
+                                .AddMethod(__Method_SayHello, serviceImpl.SayHello).Build();
+                        }
+                   
+                  AddMethod内部会调用:callHandlers.Add(method.FullName, ServerCalls.[UnaryxxxCall](method, handler));
+                  这个时候, 所有的Sayhello之类的delegate 会变成IServerCallHandler
+                  {
+                    UnaryServerCallHandler
+                    ServerStreamingServerCallHandler
+                    ......
+                  }
+                  此时传递进来的callHandlers数据结构
+                 * callHandlers:
+                 *      map[key, IServerCallHandler]
+                 *      key: /url
+                 *      value:  x-delegate
+                 *  IServerCallHandler都会有2个属性:
+                                readonly Method<TRequest, TResponse> method;
+                                readonly [ServerStreamingServerMethod]<TRequest, TResponse> handler; -->这个XXXServerMethod就是一个delegate
+                 *  
+                 * 
+                 */
                 var hFiled = callHandler.Value.GetFieldValue<Delegate>("handler", bindingFlags);
                 var handler = hFiled.Item1;
                 var types = hFiled.Item2.DeclaringType.GenericTypeArguments;
