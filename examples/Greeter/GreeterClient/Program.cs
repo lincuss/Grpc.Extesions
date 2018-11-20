@@ -19,6 +19,9 @@ namespace GreeterClient
             var configBuilder = new ConfigurationBuilder();
             var conf = configBuilder.SetBasePath(configPath).AddJsonFile("appsettings.json", false, true).Build();
 
+            var innerLogger = new Grpc.Core.Logging.LogLevelFilterLogger(new Grpc.Core.Logging.ConsoleLogger(), Grpc.Core.Logging.LogLevel.Debug);
+            GrpcEnvironment.SetLogger(innerLogger);
+
             //使用依赖注入
             var services = new ServiceCollection()
                  .AddGrpcMiddleware4Client()
@@ -26,13 +29,11 @@ namespace GreeterClient
                 .AddGrpcClient<Greeter.GreeterClient>(conf.GetSection("services:remotes:GreeterServer").Get<RemoteServiceOption>());//注入grpc client
             var provider = services.BuildServiceProvider();
 
-            var innerLogger = new Grpc.Core.Logging.LogLevelFilterLogger(new Grpc.Core.Logging.ConsoleLogger(), Grpc.Core.Logging.LogLevel.Debug);
-            GrpcEnvironment.SetLogger(innerLogger);
-
             //从容器获取client
             var client = provider.GetService<Greeter.GreeterClient>();
             var user = "you";
 
+        call:
             for (int i = 0; i < 10; i++)
             {
                 var reply = client.SayHello(new HelloRequest { Name = user + i.ToString() });
@@ -41,6 +42,7 @@ namespace GreeterClient
 
             Console.WriteLine("Press any key to exit...");
             Console.ReadKey();
+            goto call;
         }
     }
 }

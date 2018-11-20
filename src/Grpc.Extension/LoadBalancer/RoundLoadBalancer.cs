@@ -8,7 +8,7 @@ namespace Grpc.Extension.LoadBalancer
 {
     public class RoundLoadBalancer : ILoadBalancer
     {
-        private ILogger _logger = Core.GrpcEnvironment.Logger.ForType<RoundLoadBalancer>();
+        private ILogger _logger = GrpcEnvironment.Logger.ForType<RoundLoadBalancer>();
 
         /// <summary>
         /// round point

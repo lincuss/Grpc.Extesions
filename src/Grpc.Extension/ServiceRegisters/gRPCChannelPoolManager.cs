@@ -117,7 +117,6 @@ namespace Grpc.Extension
             _freshServiceListTimer = new Timer(async obj =>
             {
                 await this.DownLoadServiceListAsync();
-                _logger.Debug($"{this._freshServiceListInterval}后，继续timer");
             });
 
             _freshServiceListTimer.Change(Timeout.Infinite, Timeout.Infinite);
@@ -128,7 +127,7 @@ namespace Grpc.Extension
             try
             {
                 _freshServiceListTimer.Change(Timeout.Infinite, Timeout.Infinite);
-                _logger.Debug($"start DownLoadServiceList.");
+                _logger.Debug($"[{RemoteServiceOption.ServiceName}] starting DownLoadServiceList.");
 
                 //当前正在使用的servicelist
                 var currentUsageServiceChannels =
@@ -144,7 +143,7 @@ namespace Grpc.Extension
 
                 if (newestService.Count == 0)
                 {
-                    _logger.Info($"找不到服务  {this.RemoteServiceOption.ServiceName};warning!!!");
+                    _logger.Info($"[{this.RemoteServiceOption.ServiceName}] 找不到服务 warning!!!");
                     return;
                 }
 
@@ -153,7 +152,7 @@ namespace Grpc.Extension
                 var abandonServices = currentUsageServiceChannels.Except(newestService, new AgentServerComparer());
                 if (newServices.Count() == 0 && abandonServices.Count() == 0)
                 {
-                    _logger.Debug($"[{RemoteServiceOption.ServiceName}]服务没有变化");
+                    _logger.Debug($"[{RemoteServiceOption.ServiceName}] no changes");
                     return;
                 }
 
@@ -165,7 +164,7 @@ namespace Grpc.Extension
                     ConnectedAgentServiceChannels.Remove(abandonPair);
                     abandonPair.Channel.ShutdownAsync();
 
-                    _logger.Info($"移除失效的service: {abandonPair.AgentService.Service}:{abandonPair.AgentService.ID}  {abandonPair.AgentService.Address}:{abandonPair.AgentService.Port}, ");
+                    _logger.Info($"[{RemoteServiceOption.ServiceName}] 移除失效的service: {abandonPair.AgentService.ID} ");
                 });
 
                 //添加新的channel
@@ -178,7 +177,7 @@ namespace Grpc.Extension
             finally
             {
                 this._freshServiceListTimer.Change(this._freshServiceListInterval, Timeout.Infinite);
-                _logger.Debug($"set time for {RemoteServiceOption.ServiceName}, {this._freshServiceListInterval} 后继续downloadServiceList");
+                _logger.Debug($"[{RemoteServiceOption.ServiceName}] set time to update services list");
             }
         }
 
