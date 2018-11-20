@@ -48,7 +48,7 @@ namespace Grpc.Extension
 
         public static void BuildInterl4Grpc(this IServiceCollection services)
         {
-            GrpcExtensions.ServiceProvider = services.BuildServiceProvider();
+            GrpcServicesExtensions.ServiceProvider = services.BuildServiceProvider();
         }
     }
 }
