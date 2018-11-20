@@ -45,13 +45,6 @@ namespace Grpc.Extension
             //添加客户端中间件的CallInvoker
             services.AddSingleton<AutoChannelCallInvoker>();
             services.AddSingleton<CallInvoker, InterceptorCallInvoker>();
-
-            //默认使用轮询负载策略 后续可扩展其他策略（基于session, 随机等）
-            if (!services.Any(p => p.ServiceType == typeof(ILoadBalancer)))
-            {
-                services.AddSingleton<ILoadBalancer, RoundLoadBalancer>();
-            }
-
             return services;
         }
 

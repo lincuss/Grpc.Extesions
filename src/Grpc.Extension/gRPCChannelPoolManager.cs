@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Grpc.Extension.LoadBalancer;
 
 namespace Grpc.Extension
 {
@@ -15,33 +16,37 @@ namespace Grpc.Extension
     /// <seealso cref="FM.ConsulInterop.ConsulInterop" />
     public class GRPCChannelPoolManager : ConsulInterop
     {
-        ILogger _logger => Core.GrpcEnvironment.Logger.ForType<GRPCChannelPoolManager>();
+        ILogger _logger => GrpcEnvironment.Logger.ForType<GRPCChannelPoolManager>();
 
         /// <summary>
         /// timer for fresh service  
         /// </summary>
         Timer _freshServiceListTimer = null;
+
         /// <summary>
         /// fresh ServiceList Interval
         /// </summary>
         int _freshServiceListInterval = Timeout.Infinite;
-        public string ServiceName { get; set; }
 
         /// <summary>
-        /// round point
+        /// service register service name
         /// </summary>
-        private int _roundProxyIndex = 0;
-        RemoteServiceOption clientConfig = null;
+        public string GrpcSrvName => RemoteServiceOption.GrpcSrvName;
+
+        public ILoadBalancer LoadBalancer { get; private set; } = new RoundLoadBalancer();
+
+        internal RemoteServiceOption RemoteServiceOption { get; private set; }
 
         private GRPCChannelPoolManager()
         {
 
         }
+
         public GRPCChannelPoolManager(RemoteServiceOption config)
         {
-            this.clientConfig = config;
-            this.ServiceName = config.GrpcSrvName;
+            RemoteServiceOption = config;
             InitGrpcChannel();
+            _logger.Info($"添加client with :{config.ToString()}");
         }
 
         /// <summary>
@@ -49,17 +54,17 @@ namespace Grpc.Extension
         /// </summary>
         private void InitGrpcChannel()
         {
-            if (clientConfig.ConsulIntegration)
+            if (RemoteServiceOption.ConsulIntegration)
             {
-                InitConsulClient(clientConfig.ConsulAddress);
+                InitConsulClient(RemoteServiceOption.ConsulAddress);
 
-                InitUpdateServiceListTimer(this.clientConfig.FreshInterval);
-                _logger.Debug($"InitUpdateServiceListTimer: {this.clientConfig.FreshInterval}ms");
+                InitUpdateServiceListTimer(this.RemoteServiceOption.FreshInterval);
+                _logger.Debug($"InitUpdateServiceListTimer: {this.RemoteServiceOption.FreshInterval}ms");
             }
             else
             {
-                _logger.Debug("direct connect:" + this.clientConfig.ServiceAddress);
-                var addressList = this.clientConfig.ServiceAddress.Split(',');
+                _logger.Debug("direct connect:" + this.RemoteServiceOption.ServiceAddress);
+                var addressList = this.RemoteServiceOption.ServiceAddress.Split(',');
                 foreach (var address in addressList)
                 {
                     if (string.IsNullOrWhiteSpace(address)) continue;
@@ -68,31 +73,6 @@ namespace Grpc.Extension
                     AddGrpcChannel(hostIp[0], int.Parse(hostIp[1]), new AgentService { ID = $"direct:{address}" });
                 }
             }
-        }
-
-        public struct AgentServiceChannelPair
-        {
-            /// <summary>
-            /// Gets or sets the agent service.
-            /// </summary>
-            /// <value>
-            /// The agent service.
-            /// </value>
-            public AgentService AgentService { get; set; }
-            /// <summary>
-            /// Gets or sets the channel.
-            /// </summary>
-            /// <value>
-            /// The channel.
-            /// </value>
-            public Channel Channel { get; set; }
-            /// <summary>
-            /// Gets or sets the proxy.
-            /// </summary>
-            /// <value>
-            /// The proxy.
-            /// </value>
-            public Object Proxy { get; set; }
         }
 
         /// <summary>
@@ -120,6 +100,11 @@ namespace Grpc.Extension
         /// </value>
         public List<AgentServiceChannelPair> ConnectedAgentServiceChannels { get; private set; } = new List<AgentServiceChannelPair>();
 
+        public void SetLoadBalanceStragety(ILoadBalancer loadBalancer)
+        {
+            LoadBalancer = loadBalancer;
+        }
+
         /// <summary>
         /// Initializes the update service list timer.
         /// </summary>
@@ -127,7 +112,7 @@ namespace Grpc.Extension
         /// <param name="freshServiceListInterval">The fresh service list interval.</param>
         private void InitUpdateServiceListTimer(int freshServiceListInterval)
         {
-            this._freshServiceListInterval = freshServiceListInterval;
+            _freshServiceListInterval = freshServiceListInterval;
 
             _freshServiceListTimer = new Timer(async obj =>
             {
@@ -138,19 +123,19 @@ namespace Grpc.Extension
             _freshServiceListTimer.Change(Timeout.Infinite, Timeout.Infinite);
         }
 
-        private async Task DownLoadServiceListAsync()
+        internal async Task DownLoadServiceListAsync()
         {
             try
             {
-                this._freshServiceListTimer.Change(Timeout.Infinite, Timeout.Infinite);
+                _freshServiceListTimer.Change(Timeout.Infinite, Timeout.Infinite);
                 _logger.Debug($"start DownLoadServiceList.");
 
                 //当前正在使用的servicelist
                 var currentUsageServiceChannels =
-                    this.ConnectedAgentServiceChannels.ConvertAll<AgentService>(p => p.AgentService);
+                    ConnectedAgentServiceChannels.ConvertAll(p => p.AgentService);
 
                 var newestService = new List<AgentService>();
-                var passOnlyService = await this.ConsulClient.Health.Service(this.clientConfig.ServiceName, "", true);
+                var passOnlyService = await ConsulClient.Health.Service(this.RemoteServiceOption.ServiceName, "", true);
 
                 passOnlyService.Response.ToList().ForEach(p =>
                 {
@@ -159,7 +144,7 @@ namespace Grpc.Extension
 
                 if (newestService.Count == 0)
                 {
-                    _logger.Info($"找不到服务  {this.clientConfig.ServiceName};warning!!!");
+                    _logger.Info($"找不到服务  {this.RemoteServiceOption.ServiceName};warning!!!");
                     return;
                 }
 
@@ -168,7 +153,7 @@ namespace Grpc.Extension
                 var abandonServices = currentUsageServiceChannels.Except(newestService, new AgentServerComparer());
                 if (newServices.Count() == 0 && abandonServices.Count() == 0)
                 {
-                    _logger.Debug($"consul服务没有更新..");
+                    _logger.Debug($"[{RemoteServiceOption.ServiceName}]服务没有变化");
                     return;
                 }
 
@@ -176,8 +161,8 @@ namespace Grpc.Extension
                 //移除已经失效的channel
                 abandonServices.ToList().ForEach(p =>
                 {
-                    var abandonPair = this.ConnectedAgentServiceChannels.First(pair => pair.AgentService == p);
-                    this.ConnectedAgentServiceChannels.Remove(abandonPair);
+                    var abandonPair = ConnectedAgentServiceChannels.First(pair => pair.AgentService == p);
+                    ConnectedAgentServiceChannels.Remove(abandonPair);
                     abandonPair.Channel.ShutdownAsync();
 
                     _logger.Info($"移除失效的service: {abandonPair.AgentService.Service}:{abandonPair.AgentService.ID}  {abandonPair.AgentService.Address}:{abandonPair.AgentService.Port}, ");
@@ -185,8 +170,6 @@ namespace Grpc.Extension
 
                 //添加新的channel
                 newServices.ToList().ForEach(p => AddGrpcChannel(p.Address, p.Port, p));
-                Interlocked.Exchange(ref _roundProxyIndex, 0);
-                _logger.Debug("roundProxyIndex 变更为0");
             }
             catch (Exception ex)
             {
@@ -195,9 +178,46 @@ namespace Grpc.Extension
             finally
             {
                 this._freshServiceListTimer.Change(this._freshServiceListInterval, Timeout.Infinite);
-                _logger.Debug(
-                    $"register time, {this._freshServiceListInterval} 后继续downloadServiceList");
+                _logger.Debug($"set time for {RemoteServiceOption.ServiceName}, {this._freshServiceListInterval} 后继续downloadServiceList");
             }
+        }
+
+        internal void CheckPoolState()
+        {
+            // download service list
+            if (ConnectedAgentServiceChannels.Count == 0)
+            {
+                DownLoadServiceListAsync().Wait(); //sync
+            }
+
+            if (ConnectedAgentServiceChannels.Count == 0)
+            {
+                throw new Exception($"[no-available-grpc-service->{RemoteServiceOption}]");
+            }
+        }
+
+        /// <summary>
+        /// 判断channel状态,如果channel状态不正常则移除
+        /// </summary>
+        /// <param name="choosePair"></param>
+        /// <returns></returns>
+        internal bool CheckAndProcessChannelStatus(AgentServiceChannelPair choosePair)
+        {
+            //当channel相关的service shutdown之后,该状态一直会处于connecting的状态
+            //如果此时采用的是random port,问题比较严重
+            //所以,一旦服务检测到挂了之后,就直接清除该connection
+            if (choosePair.Channel.State == ChannelState.Shutdown ||
+                choosePair.Channel.State == ChannelState.TransientFailure ||
+                choosePair.Channel.State == ChannelState.Connecting)
+            {
+                ConnectedAgentServiceChannels.Remove(choosePair);
+                _logger.Error(
+                    $"当前Channel异常,状态：{choosePair.Channel.State}  ServiceId:{choosePair.AgentService.ID} ,已经被移除");
+
+                return false;
+            }
+
+            return true;
         }
 
         private void AddGrpcChannel(string address, int port, AgentService agentService)
@@ -220,8 +240,6 @@ namespace Grpc.Extension
         /// <exception cref="Exception"></exception>
         public Channel FetchOneChannel => FetchOneAgentServiceChannelPair.Channel;
 
-        private readonly object _fetchLock = new object();
-
         /// <summary>
         /// Gets the fetch one agent service channel pair.
         /// </summary>
@@ -229,76 +247,35 @@ namespace Grpc.Extension
         /// The fetch one agent service channel pair.
         /// </value>
         /// <exception cref="Exception"></exception>
-        public AgentServiceChannelPair FetchOneAgentServiceChannelPair
-        {
-            get
-            {
-                var entryed = false;
-                try
-                {
-
-                    /*
-                     * 移除lock的原因在于lock没有timeout机制
-                     * 如果突然大量的请求来了之后,
-                     * 会全部卡在这个方法之中就会导致大量的阻塞(并且阻塞之后没有任何意义)
-                     * 出现阻塞的地方只有可能是正在更新,正在更新的过程之中,所有的调用都应该全部失败..
-                     */
-                    entryed = Monitor.TryEnter(_fetchLock, 100);
-                    if (!entryed)
-                    {
-                        //timeout
-                        throw new Exception("Fetch timeout, 服务暂不可用");
-                    }
-
-                fetch:
-
-                    // 当connectedAgentServiceChannles为空的时候,需要clean list
-                    // download service list
-                    if (this.ConnectedAgentServiceChannels.Count == 0)
-                    {
-                        DownLoadServiceListAsync().Wait(); //sync
-                    }
-
-                    if (this.ConnectedAgentServiceChannels.Count == 0)
-                    {
-                        throw new Exception($"[no-available-grpc-service->{this.clientConfig}]");
-                    }
-
-                    //循环调度
-                    if (_roundProxyIndex == this.ConnectedAgentServiceChannels.Count)
-                    {
-                        Interlocked.Exchange(ref _roundProxyIndex, 0);
-                    }
-
-                    var choosePair = this.ConnectedAgentServiceChannels[_roundProxyIndex];
-
-                    //当channel相关的service shutdown之后,该状态一直会处于connecting的状态
-                    //如果此时采用的是random port,问题比较严重
-                    //所以,一旦服务检测到挂了之后,就直接清除该connection
-                    if (choosePair.Channel.State == ChannelState.Shutdown ||
-                        choosePair.Channel.State == ChannelState.TransientFailure ||
-                        choosePair.Channel.State == ChannelState.Connecting)
-                    {
-                        this.ConnectedAgentServiceChannels.Remove(choosePair);
-                        _logger.Error(
-                            $"当前Channel异常,状态：{choosePair.Channel.State}  ServiceId:{choosePair.AgentService.ID} ,已经被移除");
-
-                        Interlocked.Exchange(ref _roundProxyIndex, 0);
-                        goto fetch;
-                    }
-
-                    Interlocked.Increment(ref _roundProxyIndex);
-
-                    _logger.Debug($"使用proxy:{choosePair.AgentService.ID} ");
-                    return choosePair;
-                }
-                finally
-                {
-                    if (entryed) Monitor.Exit(_fetchLock);
-                }
-            }
-        }
+        public AgentServiceChannelPair FetchOneAgentServiceChannelPair => LoadBalancer.SelectEndpoint(this.GrpcSrvName);
 
         public static Lazy<List<GRPCChannelPoolManager>> Instances = new Lazy<List<GRPCChannelPoolManager>>(() => new List<GRPCChannelPoolManager>(), true);
+    }
+
+    public class AgentServiceChannelPair
+    {
+        /// <summary>
+        /// Gets or sets the agent service.
+        /// </summary>
+        /// <value>
+        /// The agent service.
+        /// </value>
+        public AgentService AgentService { get; set; }
+
+        /// <summary>
+        /// Gets or sets the channel.
+        /// </summary>
+        /// <value>
+        /// The channel.
+        /// </value>
+        public Channel Channel { get; set; }
+
+        /// <summary>
+        /// Gets or sets the proxy.
+        /// </summary>
+        /// <value>
+        /// The proxy.
+        /// </value>
+        public Object Proxy { get; set; }
     }
 }

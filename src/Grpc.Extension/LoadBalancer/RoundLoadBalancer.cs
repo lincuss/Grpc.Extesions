@@ -1,31 +1,71 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
+﻿using Grpc.Core;
+using Grpc.Core.Logging;
+using System;
 using System.Linq;
-using System.Text;
+using System.Threading;
 
 namespace Grpc.Extension.LoadBalancer
 {
-    public class RoundLoadBalancer : ILoadBalancer 
+    public class RoundLoadBalancer : ILoadBalancer
     {
-        private ConcurrentDictionary<string, int> _serviceInvokeIndexs = new ConcurrentDictionary<string, int>();
+        private ILogger _logger = Core.GrpcEnvironment.Logger.ForType<RoundLoadBalancer>();
 
         /// <summary>
-        /// 轮询获取Endpoint
+        /// round point
         /// </summary>
-        /// <param name="serviceName"></param>
-        /// <param name="endpoints"></param>
-        /// <returns></returns>
-        public string SelectEndpoint(string serviceName, List<string> endpoints)
+        private int _roundProxyIndex = 0;
+
+        /// <summary>
+        /// for lock
+        /// </summary>
+        private readonly object _fetchLock = new object();
+
+        public AgentServiceChannelPair SelectEndpoint(string serviceName)
         {
-            endpoints = endpoints.OrderBy(q => q).ToList();
-            var index = _serviceInvokeIndexs.GetOrAdd(serviceName, 0);
-            if (index >= endpoints.Count)
+            var entryed = false;
+            var pool = GRPCChannelPoolManager.Instances.Value.First(p => p.GrpcSrvName == serviceName);
+            try
             {
-                index = _serviceInvokeIndexs.AddOrUpdate(serviceName, 0, (k, v) => 0);
+                /*
+                 * 移除lock的原因在于lock没有timeout机制
+                 * 如果突然大量的请求来了之后,
+                 * 会全部卡在这个方法之中就会导致大量的阻塞(并且阻塞之后没有任何意义)
+                 * 出现阻塞的地方只有可能是正在更新,正在更新的过程之中,所有的调用都应该全部失败..
+                 */
+                entryed = Monitor.TryEnter(_fetchLock, 100);
+                if (!entryed)
+                {
+                    //timeout
+                    throw new Exception("Fetch timeout, 服务暂不可用");
+                }
+
+            fetch:
+
+                pool.CheckPoolState();
+
+                //reset to first
+                if (_roundProxyIndex == pool.ConnectedAgentServiceChannels.Count)
+                {
+                    Interlocked.Exchange(ref _roundProxyIndex, 0);
+                }
+
+                var choosePair = pool.ConnectedAgentServiceChannels[_roundProxyIndex];
+
+                if (!pool.CheckAndProcessChannelStatus(choosePair))
+                {
+                    Interlocked.Exchange(ref _roundProxyIndex, 0);
+                    goto fetch;
+                }
+
+                Interlocked.Increment(ref _roundProxyIndex);
+
+                _logger.Debug($"使用proxy:{choosePair.AgentService.ID} ");
+                return choosePair;
             }
-            _serviceInvokeIndexs.AddOrUpdate(serviceName, index, (k, v) => v + 1);
-            return endpoints.ElementAt(index);
+            finally
+            {
+                if (entryed) Monitor.Exit(_fetchLock);
+            }
         }
     }
 }

@@ -66,8 +66,7 @@ namespace Grpc.Extension.Consul
                 where TRequest : class
                 where TResponse : class
         {
-
-            var poolMgr = GRPCChannelPoolManager.Instances.Value.Find(p => p.ServiceName == method.ServiceName);
+            var poolMgr = GRPCChannelPoolManager.Instances.Value.Find(p => p.GrpcSrvName == method.ServiceName);
             var channel = poolMgr.FetchOneChannel;
             return new CallInvocationDetails<TRequest, TResponse>(channel, method, host, options);
         }
