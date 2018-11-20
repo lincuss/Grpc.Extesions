@@ -1,11 +1,9 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using System.Linq;
 using Grpc.Core;
 using Grpc.Extension.Consul;
 using System.Reflection;
 using Grpc.Extension.Common;
 using Grpc.Extension.Interceptors;
-using Grpc.Extension.LoadBalancer;
 using Grpc.Extension.Registers;
 
 namespace Grpc.Extension
@@ -44,7 +42,7 @@ namespace Grpc.Extension
         {
             //添加客户端中间件的CallInvoker
             services.AddSingleton<AutoChannelCallInvoker>();
-            services.AddSingleton<CallInvoker, InterceptorCallInvoker>();
+            services.AddSingleton<CallInvoker, ClientMiddlewareCallInvoker>();
             return services;
         }
 

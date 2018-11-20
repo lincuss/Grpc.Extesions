@@ -1,22 +1,19 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using Grpc.Core;
 using Grpc.Core.Interceptors;
 using Grpc.Extension.Consul;
 using Grpc.Extension.Interceptors;
-using Grpc.Extension.Internal;
 
 namespace Grpc.Extension
 {
     /// <summary>
     /// 客户端中间件的CallInvoker
     /// </summary>
-    public class InterceptorCallInvoker : CallInvoker
+    public class ClientMiddlewareCallInvoker : CallInvoker
     {
         private CallInvoker _interceptorCallInvoker;
-        public InterceptorCallInvoker(AutoChannelCallInvoker autoChannelCallInvoker, IEnumerable<ClientInterceptor> clientInterceptors)
+        public ClientMiddlewareCallInvoker(AutoChannelCallInvoker autoChannelCallInvoker, IEnumerable<ClientInterceptor> clientInterceptors)
         {
             _interceptorCallInvoker = autoChannelCallInvoker.Intercept(clientInterceptors.ToArray());
         }
