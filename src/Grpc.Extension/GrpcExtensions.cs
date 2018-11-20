@@ -12,6 +12,7 @@ using Grpc.Extension.Consul;
 using Grpc.Extension.Internal;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
+using Grpc.Extension.Registers;
 
 namespace Grpc.Extension
 {
@@ -64,26 +65,6 @@ namespace Grpc.Extension
         }
 
         /// <summary>
-        /// 注入Grpc配制
-        /// </summary>
-        /// <param name="server"></param>
-        /// <param name="options"></param>
-        /// <returns></returns>
-        [Obsolete("请使用ServerBuiler")]
-        public static Server UseGrpcOptions(this Server server, GrpcServerOptions options)
-        {
-            GrpcServerOptions.Instance.ServiceAddress = options.ServiceAddress;
-            GrpcServerOptions.Instance.ConsulUrl = options.ConsulUrl;
-            GrpcServerOptions.Instance.ConsulServiceName = options.ConsulServiceName;
-            GrpcServerOptions.Instance.ConsulTags = options.ConsulTags;
-
-            //添加服务IPAndPort
-            var ipPort = NetHelper.GetIPAndPort(GrpcServerOptions.Instance.ServiceAddress);
-            server.Ports.Add(new ServerPort(ipPort.Item1, ipPort.Item2, ServerCredentials.Insecure));
-            return server;
-        }
-        
-        /// <summary>
         /// 注入GrpcService
         /// </summary>
         /// <param name="server"></param>
@@ -91,7 +72,7 @@ namespace Grpc.Extension
         /// <returns></returns>
         public static Server UseGrpcService(this Server server, IEnumerable<IGrpcService> grpcServices)
         {
-            var builder  = ServerServiceDefinition.CreateBuilder();
+            var builder = ServerServiceDefinition.CreateBuilder();
             grpcServices.ToList().ForEach(grpc => grpc.RegisterMethod(builder));
             server.Services.Add(builder.Build());
             return server;
@@ -149,11 +130,10 @@ namespace Grpc.Extension
                 MetaModel.Ip = ipAndPort.Host;
                 MetaModel.Port = ipAndPort.BoundPort;
 
-                //todo  不能使用console writeline
-                Console.WriteLine($"server listening {MetaModel.Ip}:{MetaModel.Port}");
+                GrpcEnvironment.Logger.ForType<Server>().Info($"server listening {MetaModel.Ip}:{MetaModel.Port}");
 
                 //注册到Consul
-                var consulManager = ServiceProvider.GetService<ConsulManager>();
+                var consulManager = ServiceProvider.GetService<ServiceRegister>();
                 consulManager.RegisterService();
             }
             return server;
@@ -167,10 +147,10 @@ namespace Grpc.Extension
         public static Server StopAndDeRegisterService(this Server server)
         {
             //从Consul反注册
-            var consulManager = ServiceProvider.GetService<ConsulManager>();
+            var consulManager = ServiceProvider.GetService<ServiceRegister>();
             consulManager.DeregisterService();
             server.ShutdownAsync().Wait();
-            
+
             return server;
         }
         #endregion

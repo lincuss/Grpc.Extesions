@@ -20,8 +20,8 @@ namespace Grpc.Extension.BaseService
             builder.AddMethod(this.BuildMethod<InfoRQ, InfoRS>("Info", "grpc", Consts.BaseServiceName), Info);
             builder.AddMethod(this.BuildMethod<MethodInfoRQ, MethodInfoRS>("MethodInfo", "grpc", Consts.BaseServiceName), MethodInfo);
             builder.AddMethod(this.BuildMethod<MethodInvokeRQ, MethodInvokeRS>("MethodInvoke", "grpc", Consts.BaseServiceName), MethodInvoke);
-
         }
+
         /// <summary>
         /// 服务基本信息
         /// </summary>

@@ -126,16 +126,16 @@
   <ItemGroup>
     <Compile Include="GreeterImpl.cs" />
     <Compile Include="GrpcHostServiceV2.cs" />
-    <Compile Include="GrpcHostService.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>
-    <None Include="app.config" />
-    <None Include="config\appsettings.json">
+    <None Include="..\Greeter\appsettings.json">
+      <Link>config\appsettings.json</Link>
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Include="app.config" />
     <None Include="config\hostsettings.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

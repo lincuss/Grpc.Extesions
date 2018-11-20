@@ -18,7 +18,6 @@ using Grpc.Extension;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace GreeterServer
 {
@@ -48,7 +47,7 @@ namespace GreeterServer
                 })
                 .ConfigureServices((ctx, services) =>
                 {
-                    services.AddGrpcExtensions(); //×¢ÈëGrpcExtensions
+                    services.AddGrpcMiddleware4Srv().BuildInterl4Grpc();
                     services.AddHostedService<GrpcHostServiceV2>();
                 });
             return host.Build();

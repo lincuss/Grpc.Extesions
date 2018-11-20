@@ -1,26 +1,12 @@
-// Copyright 2015 gRPC authors.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-using System;
-using System.IO;
 using Grpc.Core;
 using Grpc.Extension;
 using Grpc.Extension.Interceptors;
-using Grpc.Extension.Model;
 using Helloworld;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.IO;
+
 
 namespace GreeterClient
 {
@@ -31,14 +17,18 @@ namespace GreeterClient
             //使用配制文件
             var configPath = Path.Combine(AppContext.BaseDirectory, "config");
             var configBuilder = new ConfigurationBuilder();
-            var config = configBuilder.SetBasePath(configPath).AddJsonFile("appsettings.json", false, true).Build();
+            var conf = configBuilder.SetBasePath(configPath).AddJsonFile("appsettings.json", false, true).Build();
+
             //使用依赖注入
             var services = new ServiceCollection()
-                .AddGrpcExtensions()//注入GrpcExtensions
-                .AddSingleton<ClientInterceptor>(new ClientCallTimeout(10))//注入客户端中间件
-                .AddGrpcClient<Greeter.GreeterClient>(config["ConsulUrl"], "Greeter.Test");//注入grpc client
+                 .AddGrpcMiddleware4Client()
+                //.AddSingleton<ClientInterceptor>(new ClientCallTimeout(10))//注入客户端中间件
+                .AddGrpcClient<Greeter.GreeterClient>(conf.GetSection("services:remotes:GreeterServer").Get<RemoteServiceOption>());//注入grpc client
             var provider = services.BuildServiceProvider();
-            
+
+            var innerLogger = new Grpc.Core.Logging.LogLevelFilterLogger(new Grpc.Core.Logging.ConsoleLogger(), Grpc.Core.Logging.LogLevel.Debug);
+            GrpcEnvironment.SetLogger(innerLogger);
+
             //从容器获取client
             var client = provider.GetService<Greeter.GreeterClient>();
             var user = "you";

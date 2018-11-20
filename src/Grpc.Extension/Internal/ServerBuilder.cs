@@ -1,12 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using Grpc.Core;
 using Grpc.Core.Interceptors;
 using Grpc.Extension.BaseService;
 using Grpc.Extension.Interceptors;
-using Grpc.Extension.Model;
 
 namespace Grpc.Extension.Internal
 {
@@ -31,12 +29,9 @@ namespace Grpc.Extension.Internal
         /// </summary>
         /// <param name="options"></param>
         /// <returns></returns>
-        public ServerBuilder UseGrpcOptions(GrpcServerOptions options)
+        public ServerBuilder UseGrpcOptions(LocalServiceOption options)
         {
-            GrpcServerOptions.Instance.ServiceAddress = options.ServiceAddress;
-            GrpcServerOptions.Instance.ConsulUrl = options.ConsulUrl;
-            GrpcServerOptions.Instance.ConsulServiceName = options.ConsulServiceName;
-            GrpcServerOptions.Instance.ConsulTags = options.ConsulTags;
+            LocalServiceOption.Instance = options;
             return this;
         }
 
@@ -99,18 +94,21 @@ namespace Grpc.Extension.Internal
 
         public Server Build()
         {
-            Server server = new Server();
+            var server = new Server();
+
             //使用拦截器
             var serviceDefinitions = ApplyInterceptor(_serviceDefinitions, _interceptors);
+
             //添加服务定义
             foreach (var serviceDefinition in serviceDefinitions)
             {
                 server.Services.Add(serviceDefinition);
             }
+
             //添加服务IPAndPort
-            var ipPort = NetHelper.GetIPAndPort(GrpcServerOptions.Instance.ServiceAddress);
+            var ipPort = NetHelper.GetIPAndPort(LocalServiceOption.Instance.ServiceAddress);
             server.Ports.Add(new ServerPort(ipPort.Item1, ipPort.Item2, ServerCredentials.Insecure));
-            
+
             return server;
         }
 

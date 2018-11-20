@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ServiceModel.Channels;
-using System.Text;
-using Grpc.Core;
-using Microsoft.Extensions.DependencyInjection;
+﻿using Grpc.Core;
 
 namespace Grpc.Extension.Consul
 {
@@ -12,10 +7,9 @@ namespace Grpc.Extension.Consul
     /// </summary>
     public class AutoChannelCallInvoker : CallInvoker
     {
-        private ChannelManager _channelManager;
         public AutoChannelCallInvoker()
         {
-            this._channelManager = GrpcExtensions.ServiceProvider.GetService<ChannelManager>();
+
         }
 
         /// <summary>
@@ -72,7 +66,9 @@ namespace Grpc.Extension.Consul
                 where TRequest : class
                 where TResponse : class
         {
-            var channel = _channelManager.GetChannel(method.ServiceName);
+
+            var poolMgr = GRPCChannelPoolManager.Instances.Value.Find(p => p.ServiceName == method.ServiceName);
+            var channel = poolMgr.FetchOneChannel;
             return new CallInvocationDetails<TRequest, TResponse>(channel, method, host, options);
         }
     }

@@ -1,50 +1,45 @@
 ﻿using Consul;
 using Grpc.Extension.Model;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
-using Grpc.Extension.Internal;
+using Grpc.Core.Logging;
+using System.Threading.Tasks;
 
-namespace Grpc.Extension.Consul
+namespace Grpc.Extension.Registers
 {
-    public class ConsulManager
+    public class ServiceRegister
     {
-        public bool RegisterEnable => !string.IsNullOrWhiteSpace(GrpcServerOptions.Instance.ConsulUrl) && 
-                                      !string.IsNullOrWhiteSpace(GrpcServerOptions.Instance.ConsulServiceName);
+        ILogger _logger => Core.GrpcEnvironment.Logger.ForType<ServiceRegister>();
+
+        public bool RegisterEnable => LocalServiceOption.Instance.ConsulIntegration;
 
         private Timer _timerTTL;
-        private string _guid;
-
-        public ConsulManager()
-        {
-            this._guid = Guid.NewGuid().ToString();
-        }
 
         /// <summary>
-        /// 从consul获取可用的节点信息
+        /// 用于标识服务ID
         /// </summary>
-        public List<string> GetEndpointsFromConsul(string serviceName, string consulUrl = null)
+        private string _id;
+
+        public ServiceRegister()
         {
-            using (var client = CreateConsulClient(consulUrl))
-            {
-                var res = client.Health.Service(serviceName, "", true).Result;
-                return res.Response.Select(q => $"{q.Service.Address}:{q.Service.Port}").ToList();
-            }
+            _id = Guid.NewGuid().ToString();
         }
-        
+
         /// <summary>
         /// 注册服务到consul
         /// </summary>
         public void RegisterService()
         {
-            if (!RegisterEnable) return;
+            if (!RegisterEnable)
+            {
+                _logger.Info("当前配置不需要注册服务!");
+                return;
+            }
 
             RegisterServiceCore();
 
-            //因为公司的consul不支持consul主动检查服务状态，所以启动定时器主动去检测
-            _timerTTL = new Timer(state => DoTTL(), null, Timeout.Infinite, Timeout.Infinite);
-            DoTTL();
+            _timerTTL = new Timer(state => DoTTLAsync().Wait(), null, Timeout.Infinite, Timeout.Infinite);
+            DoTTLAsync().Wait();
         }
 
         private void RegisterServiceCore()
@@ -54,52 +49,49 @@ namespace Grpc.Extension.Consul
                 var registration = new AgentServiceRegistration()
                 {
                     ID = GetServiceId(),
-                    Name = GrpcServerOptions.Instance.ConsulServiceName,
-                    Tags = GrpcServerOptions.Instance.ConsulTags?.Split(','),
+                    Name = LocalServiceOption.Instance.ServiceName,
+                    Tags = LocalServiceOption.Instance.ConsulTags?.Split(','),
                     EnableTagOverride = true,
                     Address = MetaModel.Ip,
                     Port = MetaModel.Port,
-                    //因为公司的consul不支持consul主动检查服务状态，所以注释掉
-                    //Check = new AgentServiceCheck
-                    //{
-                    //    TCP = $"{MetaModel.Ip}:{MetaModel.Port}",
-                    //    Interval = TimeSpan.FromSeconds(15),
-                    //    Status = HealthStatus.Passing,
-                    //    DeregisterCriticalServiceAfter = TimeSpan.FromMinutes(1)
-                    //}
-                    //因为公司的consul不支持consul主动检查服务状态，所以主动去TTL consul
                     Check = new AgentCheckRegistration
                     {
                         ID = GetTTLCheckId(),
                         Name = "ttlcheck",
                         TTL = TimeSpan.FromSeconds(15),
-                        Status = HealthStatus.Passing,                       
+                        Status = HealthStatus.Passing,
                         DeregisterCriticalServiceAfter = TimeSpan.FromMinutes(1),
                     }
                 };
                 client.Agent.ServiceRegister(registration).Wait();
             }
+
+            _logger.Info("RegisterServiceCore success!");
         }
+
         /// <summary>
         /// 从consul反注册
         /// </summary>
         public void DeregisterService()
         {
             if (!RegisterEnable) return;
+
             using (var client = CreateConsulClient())
             {
                 client.Agent.ServiceDeregister(GetServiceId()).Wait();
+                _logger.Info("DeregisterService success!");
             }
         }
 
         private ConsulClient CreateConsulClient(string consulUrl = null)
         {
-            return new ConsulClient(conf => conf.Address = new Uri(!string.IsNullOrWhiteSpace(consulUrl) ? consulUrl : GrpcServerOptions.Instance.ConsulUrl));
+            return new ConsulClient(conf => conf.Address = new Uri(!string.IsNullOrWhiteSpace(consulUrl) ?
+                consulUrl : LocalServiceOption.Instance.ConsulAddress));
         }
 
         private string GetServiceId()
         {
-            return $"{GrpcServerOptions.Instance.ConsulServiceName}-{(MetaModel.Ip)}-{(MetaModel.Port)}-{_guid}";
+            return $"{LocalServiceOption.Instance.ServiceName}-{(MetaModel.Ip)}-{(MetaModel.Port)}-{_id}";
         }
 
         private string GetTTLCheckId()
@@ -107,20 +99,19 @@ namespace Grpc.Extension.Consul
             return $"service:{GetServiceId()}";
         }
 
-        private void DoTTL()
+        private async Task DoTTLAsync()
         {
             _timerTTL.Change(Timeout.Infinite, Timeout.Infinite);
+            Exception err = null;
             try
             {
                 using (var client = CreateConsulClient())
                 {
-                    client.Agent.PassTTL(GetTTLCheckId(), "timer:" + DateTime.Now).Wait();
+                    await client.Agent.PassTTL(GetTTLCheckId(), "timer:" + DateTime.Now);
                 }
             }
             catch (Exception ex)
             {
-                LoggerAccessor.Instance.LoggerError?.Invoke(ex);
-
                 /*
                  * passTTL会出现如下几种情况：
                  * 1. consul服务重启中，ex会显示 connection refused by ip:port
@@ -133,11 +124,15 @@ namespace Grpc.Extension.Consul
                 {
                     RegisterServiceCore();
                 }
+                err = ex;
             }
             finally
             {
-                _timerTTL.Change(TimeSpan.FromSeconds(GrpcServerOptions.Instance.ConsulTTLInterval), TimeSpan.FromSeconds(GrpcServerOptions.Instance.ConsulTTLInterval));
+                _timerTTL.Change(TimeSpan.FromSeconds(LocalServiceOption.Instance.TCPInterval),
+                    TimeSpan.FromSeconds(LocalServiceOption.Instance.TCPInterval));
             }
+
+            _logger.Debug($"passing TTL:{err}");
         }
     }
 }

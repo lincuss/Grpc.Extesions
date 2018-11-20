@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Grpc.Core;
@@ -30,7 +28,7 @@ namespace GreeterServer
         {
             //构建Server
             var serverBuilder = new ServerBuilder();
-            var serverOptions = _conf.GetSection("GrpcServer").Get<GrpcServerOptions>();
+            var serverOptions = _conf.GetSection("services:GreeterServer").Get<LocalServiceOption>();
             _server = serverBuilder.UseGrpcOptions(serverOptions)
                 .UseInterceptor(_serverInterceptors) //使用中间件
                 .UseGrpcService(Greeter.BindService(new GreeterImpl()))
@@ -40,7 +38,10 @@ namespace GreeterServer
                     log.LoggerError = exception => Console.WriteLine(exception);
                 })
                 .Build();
-            //使用DashBoard，日志，注册consul
+
+            var innerLogger = new Grpc.Core.Logging.LogLevelFilterLogger(new Grpc.Core.Logging.ConsoleLogger(), Grpc.Core.Logging.LogLevel.Debug);
+            GrpcEnvironment.SetLogger(innerLogger);
+
             _server.UseDashBoard()//使用DashBoard,需要使用FM.GrpcDashboard网站
                .StartAndRegisterService();//启动服务并注册到consul
 
