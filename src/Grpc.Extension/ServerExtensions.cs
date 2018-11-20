@@ -12,7 +12,7 @@ using Grpc.Extension.Registers;
 
 namespace Grpc.Extension
 {
-    public static class GrpcServicesExtensions
+    public static class ServerExtensions
     {
         internal static IServiceProvider ServiceProvider { get; set; }
 
