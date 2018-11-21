@@ -13,5 +13,13 @@
 -  [gRPC - An RPC library and framework](https://github.com/grpc/grpc)
 -  [consul-Service Discovery and Configuration Made Easy](https://consul.io)
 
+
+## todo
+- [ ] code first (生成proto file)
+- [ ] proto first (使用protoc 根据proto文件生成cs文件)
+- [ ] publish package on nuget.com
+- [ ] 取消logAccessor ,采用log middleware
+
+
 ## 感谢
 感谢以下的项目,排名不分先后
