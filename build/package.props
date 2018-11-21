@@ -1,0 +1,14 @@
+<Project>
+  <PropertyGroup Label="Package">
+    <Copyright></Copyright>
+
+    <Description>基于GRPC CONSUL的一个微服务架构lib</Description>
+    <PackageLicenseUrl>https://github.com/FollowmeTech/Grpc.Extesions</PackageLicenseUrl>
+    <PackageProjectUrl>https://github.com/FollowmeTech/Grpc.Extesions</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/FollowmeTech/Grpc.Extesions</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>consul;grpc;microservice</PackageTags>
+    <Company>grpc.extension Org.</Company>
+    <Authors>dev</Authors>
+  </PropertyGroup>
+</Project>
