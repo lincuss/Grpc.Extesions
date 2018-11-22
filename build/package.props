@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup Label="Package">
-    <Copyright></Copyright>
-
+    <Copyright>netx</Copyright>
+    <PackageId>Grpc.Extension</PackageId>
     <Description>基于GRPC CONSUL的一个微服务架构lib</Description>
     <PackageLicenseUrl>https://github.com/FollowmeTech/Grpc.Extesions</PackageLicenseUrl>
     <PackageProjectUrl>https://github.com/FollowmeTech/Grpc.Extesions</PackageProjectUrl>

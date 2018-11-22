@@ -9,15 +9,22 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Examples", "Examples", "{4C
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Greeter", "examples\Greeter\Greeter\Greeter.csproj", "{724DFC8C-4B57-4C3F-811C-0463BE2A2829}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GreeterClient", "examples\Greeter\GreeterClient\GreeterClient.csproj", "{ACCF4597-3748-4117-8633-1CB767F8CCC3}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GreeterClient", "examples\Greeter\GreeterClient\GreeterClient.csproj", "{ACCF4597-3748-4117-8633-1CB767F8CCC3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GreeterServer", "examples\Greeter\GreeterServer\GreeterServer.csproj", "{A7706C84-92D2-4B7A-B779-76B64D2950EC}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GreeterServer", "examples\Greeter\GreeterServer\GreeterServer.csproj", "{A7706C84-92D2-4B7A-B779-76B64D2950EC}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "FM.GrpcDashboard", "FM.GrpcDashboard", "{0EF7BF4A-D275-4AF3-9C06-13AB154CED76}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FM.GrpcDashboard", "src\FM.GrpcDashboard\src\FM.GrpcDashboard\FM.GrpcDashboard.csproj", "{2A959582-34C8-4556-AD13-093ED5917FCF}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Greeter", "Greeter", "{94B12F76-D786-4D94-A9F4-8DD7DD73685F}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "0. Resources", "0. Resources", "{9B0111A2-0FB0-45B6-B68E-8570802F9EBC}"
+	ProjectSection(SolutionItems) = preProject
+		build\common.props = build\common.props
+		build\package.props = build\package.props
+		build\version.props = build\version.props
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

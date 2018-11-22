@@ -1,6 +1,8 @@
 #!/bin/sh
-
 set -e
+
+##clean
+rm -rf publish
 
 export DOTNET_SYSTEM_NET_HTTP_USESOCKETSHTTPHANDLER=0
 
@@ -21,11 +23,8 @@ echo "pack grpc extension success"
 # 发布到nuget.org
 echo "begin push..."
 for nugetfile in ${publishdir}/*; do
-    dotnet nuget push $nugetfile -k ${followmetechnugetkey} -s https://api.nuget.org/v3/index.json
+	echo $nugetfile
+    dotnet nuget push $nugetfile -k ${followmetechNugetKey} -s https://api.nuget.org/v3/index.json
 done
 echo "push success"
 
-# 清理
-if [[ $publishdir != "/" ]] ; then
-	rm -rf ${publishdir}
-fi
