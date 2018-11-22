@@ -1,4 +1,5 @@
-## Grpc.Extesions
+[![Nuget](https://img.shields.io/nuget/v/Grpc.svg)](https://www.nuget.org/packages/FollowmeTech.Grpc.Extension/)gRPC extensions
+
 一个基于GRPC的简单微服务框架 
 
 ## 功能
